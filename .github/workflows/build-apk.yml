@@ -29,6 +29,9 @@ jobs:
       - name: Get dependencies
         run: flutter pub get
       
+      - name: Patch photo_manager plugin
+        run: bash patch-photo-manager.sh
+      
       - name: Download rclone binary
         run: bash download-rclone.sh
       
