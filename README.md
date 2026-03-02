@@ -309,6 +309,27 @@ photo-backup-app/
 └── README.md                  # 项目文档
 ```
 
+### 构建 APK
+
+详细构建指南请参考 **[BUILD_GUIDE.md](BUILD_GUIDE.md)**
+
+**快速构建：**
+
+```bash
+# 方法 1: 使用脚本（推荐）
+bash build-release.sh
+
+# 方法 2: 手动构建
+flutter clean
+flutter pub get
+bash init-project.sh
+flutter build apk --release --split-per-abi
+```
+
+**输出位置：**
+- `build/app/outputs/flutter-apk/app-arm64-v8a-release.apk`
+- `build/app/outputs/flutter-apk/app-armeabi-v7a-release.apk`
+
 ### 运行测试
 
 ```bash
