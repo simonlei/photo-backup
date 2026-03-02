@@ -3,6 +3,7 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:equatable/equatable.dart';
 import '../services/rclone_service.dart';
 import '../services/upload_queue_service.dart';
+import '../services/network_service.dart';  // 🌐 网络检测
 import '../models/upload_task.dart';
 
 // ============== Events ==============
@@ -218,6 +219,34 @@ class UploadCancelled extends UploadState {
   List<Object?> get props => [taskId, task];
 }
 
+/// 🌐 上传警告状态（网络相关）
+class UploadWarning extends UploadState {
+  final String taskId;
+  final String warningMessage;
+  final WarningType warningType;
+
+  const UploadWarning({
+    required this.taskId,
+    required this.warningMessage,
+    required this.warningType,
+  });
+
+  @override
+  List<Object?> get props => [taskId, warningMessage, warningType];
+}
+
+/// 警告类型
+enum WarningType {
+  /// ⚠️ 使用移动数据
+  mobileData,
+  
+  /// ⚠️ 网络不稳定
+  unstableNetwork,
+  
+  /// ⚠️ 电量过低
+  lowBattery,
+}
+
 class UploadQueueLoaded extends UploadState {
   final List<UploadTask> pending;
   final List<UploadTask> uploading;
@@ -244,6 +273,7 @@ class UploadQueueLoaded extends UploadState {
 class UploadBloc extends Bloc<UploadEvent, UploadState> {
   final RcloneService _rcloneService;
   final UploadQueueService _queueService;
+  final NetworkService _networkService;  // 🌐 网络检测服务
 
   // 存储活跃的上传订阅
   final Map<String, StreamSubscription<UploadProgress>> _uploadSubscriptions = {};
@@ -258,8 +288,10 @@ class UploadBloc extends Bloc<UploadEvent, UploadState> {
   UploadBloc({
     RcloneService? rcloneService,
     UploadQueueService? queueService,
+    NetworkService? networkService,  // 🌐 可选注入
   })  : _rcloneService = rcloneService ?? RcloneService(),
         _queueService = queueService ?? UploadQueueService(),
+        _networkService = networkService ?? NetworkService(),  // 🌐 默认实例
         super(const UploadInitial()) {
     on<StartUpload>(_onStartUpload);
     on<StartBatchUpload>(_onStartBatchUpload);
@@ -272,11 +304,33 @@ class UploadBloc extends Bloc<UploadEvent, UploadState> {
   }
 
   /// 处理单个上传任务开始
+  /// 🌐 上传前检查网络状态
   Future<void> _onStartUpload(
     StartUpload event,
     Emitter<UploadState> emit,
   ) async {
     try {
+      // 🌐 检查网络连接
+      final networkCheck = await _networkService.checkBeforeUpload();
+      
+      if (networkCheck == NetworkCheckResult.noConnection) {
+        emit(UploadFailure(
+          taskId: event.taskId,
+          errorMessage: '❌ 无网络连接，请检查网络设置',
+        ));
+        return;
+      }
+      
+      if (networkCheck == NetworkCheckResult.mobile) {
+        // ⚠️ 移动数据警告（由 UI 层处理确认）
+        emit(UploadWarning(
+          taskId: event.taskId,
+          warningMessage: '⚠️ 当前使用移动数据，建议切换到 WiFi',
+          warningType: WarningType.mobileData,
+        ));
+        // 注意：这里仍然继续上传，由 UI 决定是否取消
+      }
+      
       // 创建任务
       final task = UploadTask.create(
         id: event.taskId,
