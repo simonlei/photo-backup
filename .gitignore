@@ -1,0 +1,189 @@
+# Flutter/Dart
+.dart_tool/
+.flutter-plugins
+.flutter-plugins-dependencies
+.packages
+.pub-cache/
+.pub/
+build/
+*.g.dart
+*.freezed.dart
+*.iconfig.dart
+
+# iOS
+*.mode1v3
+*.mode2v3
+*.moved-aside
+*.pbxuser
+*.perspectivev3
+**/*sync/
+.sconsign.dblite
+.tags*
+**/.vagrant/
+**/DerivedData/
+Icon?
+**/Pods/
+**/.symlinks/
+profile
+xcuserdata
+**/.generated/
+Flutter/App.framework
+Flutter/Flutter.framework
+Flutter/Flutter.podspec
+Flutter/Generated.xcconfig
+Flutter/ephemeral/
+Flutter/app.flx
+Flutter/app.zip
+Flutter/flutter_assets/
+Flutter/flutter_export_environment.sh
+ServiceDefinitions.json
+Runner/GeneratedPluginRegistrant.*
+
+# Android
+**/.gradle
+**/local.properties
+**/.idea/workspace.xml
+**/.idea/tasks.xml
+**/.idea/gradle.xml
+**/.idea/assetWizardSettings.xml
+**/.idea/dictionaries
+**/.idea/libraries
+**/.idea/jarRepositories.xml
+**/.idea/caches
+**/.idea/modules.xml
+**/.idea/navEditor.xml
+**/.DS_Store
+**/build/
+**/captures/
+**/.externalNativeBuild
+**/.cxx
+*.iml
+*.class
+*.log
+*.pyc
+*.swp
+.DS_Store
+.atom/
+.buildlog/
+.history
+.svn/
+migrate_working_dir/
+
+# Android Studio
+**/.idea/
+*.iml
+*.iws
+**/.gradle/
+**/local.properties
+android/.gradle/
+android/captures/
+android/gradlew
+android/gradlew.bat
+android/local.properties
+android/**/GeneratedPluginRegistrant.java
+android/**/GeneratedPluginRegistrant.kt
+
+# IntelliJ
+*.iml
+*.ipr
+*.iws
+.idea/
+
+# Visual Studio Code
+.vscode/
+*.code-workspace
+.history/
+
+# Miscellaneous
+*.class
+*.lock
+*.log
+*.pyc
+*.swp
+.DS_Store
+.atom/
+.buildlog/
+.history
+.svn/
+
+# Coverage
+coverage/
+*.lcov
+
+# Exceptions
+!**/ios/**/default.mode1v3
+!**/ios/**/default.mode2v3
+!**/ios/**/default.pbxuser
+!**/ios/**/default.perspectivev3
+
+# Sensitive files (even if encrypted, don't commit)
+**/*.jks
+**/*.keystore
+**/key.properties
+**/google-services.json
+**/GoogleService-Info.plist
+
+# rclone binary (too large, download separately)
+assets/rclone/rclone
+android/app/src/main/jniLibs/*/librclone.so
+
+# User-specific configurations
+rclone.conf
+*.conf
+
+# Temporary files
+*.tmp
+*.temp
+~*
+
+# Database files (local development)
+*.db
+*.sqlite
+*.sqlite3
+
+# Generated files
+**/GeneratedPluginRegistrant.*
+
+# App-specific
+todos/*-complete-*.md
+.openclaw/
+
+# Build artifacts
+*.apk
+*.aab
+*.ipa
+*.app
+*.dSYM.zip
+*.dSYM
+
+# Dependencies
+node_modules/
+.flutter-plugins
+.flutter-plugins-dependencies
+
+# Test coverage
+coverage/
+test/.test_coverage.dart
+
+# Environment
+.env
+.env.local
+.env.*.local
+
+# MacOS
+.DS_Store
+.AppleDouble
+.LSOverride
+Icon
+._*
+
+# Windows
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+$RECYCLE.BIN/
+
+# Linux
+*~
+.directory
+.Trash-*
