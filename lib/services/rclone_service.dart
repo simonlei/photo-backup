@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'package:flutter/services.dart';
+import 'package:flutter/foundation.dart';  // 🔒 添加 @immutable
 
 /// rclone 服务封装
 /// 提供 Platform Channel 调用接口
@@ -133,6 +134,8 @@ class RcloneService {
 }
 
 /// 上传进度数据类
+/// 🔒 @immutable 确保对象不可变
+@immutable
 class UploadProgress {
   final String uploadId;
   final double percent;
@@ -142,7 +145,7 @@ class UploadProgress {
   final int etaSeconds;
   final UploadStatus status;
   
-  UploadProgress({
+  const UploadProgress({
     required this.uploadId,
     required this.percent,
     required this.bytesTransferred,
@@ -165,6 +168,27 @@ class UploadProgress {
     etaSeconds: map['etaSeconds'] as int,
     status: UploadStatus.values[map['status'] as int],
   );
+  
+  /// 🔒 创建副本（不可变更新）
+  UploadProgress copyWith({
+    String? uploadId,
+    double? percent,
+    int? bytesTransferred,
+    int? totalBytes,
+    double? speedMBps,
+    int? etaSeconds,
+    UploadStatus? status,
+  }) {
+    return UploadProgress(
+      uploadId: uploadId ?? this.uploadId,
+      percent: percent ?? this.percent,
+      bytesTransferred: bytesTransferred ?? this.bytesTransferred,
+      totalBytes: totalBytes ?? this.totalBytes,
+      speedMBps: speedMBps ?? this.speedMBps,
+      etaSeconds: etaSeconds ?? this.etaSeconds,
+      status: status ?? this.status,
+    );
+  }
   
   Map<String, dynamic> toMap() => {
     'uploadId': uploadId,

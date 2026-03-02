@@ -1,4 +1,5 @@
 import 'package:equatable/equatable.dart';
+import 'package:flutter/foundation.dart';  // 🔒 添加 @immutable
 
 /// 上传状态枚举
 enum UploadStatus {
@@ -10,6 +11,8 @@ enum UploadStatus {
 }
 
 /// 上传任务模型
+/// 🔒 @immutable 确保对象不可变
+@immutable
 class UploadTask extends Equatable {
   final String id;
   final String localPath;

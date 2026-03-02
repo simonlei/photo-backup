@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:equatable/equatable.dart';
+import 'package:flutter/foundation.dart';  // 🔒 添加 @immutable
 import '../services/rclone_service.dart';
 import '../services/upload_queue_service.dart';
 import '../services/network_service.dart';  // 🌐 网络检测
@@ -98,6 +99,8 @@ class LoadUploadQueue extends UploadEvent {
 
 // ============== States ==============
 
+/// 🔒 @immutable 确保状态不可变
+@immutable
 abstract class UploadState extends Equatable {
   const UploadState();
 
@@ -105,10 +108,12 @@ abstract class UploadState extends Equatable {
   List<Object?> get props => [];
 }
 
+@immutable
 class UploadInitial extends UploadState {
   const UploadInitial();
 }
 
+@immutable
 class UploadInProgress extends UploadState {
   final String taskId;
   final double progress;
@@ -165,6 +170,7 @@ class UploadInProgress extends UploadState {
   }
 }
 
+@immutable
 class UploadSuccess extends UploadState {
   final String taskId;
   final UploadTask task;
@@ -178,6 +184,7 @@ class UploadSuccess extends UploadState {
   List<Object?> get props => [taskId, task];
 }
 
+@immutable
 class UploadFailure extends UploadState {
   final String taskId;
   final String errorMessage;
@@ -193,6 +200,7 @@ class UploadFailure extends UploadState {
   List<Object?> get props => [taskId, errorMessage, failedTask];
 }
 
+@immutable
 class UploadPaused extends UploadState {
   final String taskId;
   final UploadTask task;
@@ -206,6 +214,7 @@ class UploadPaused extends UploadState {
   List<Object?> get props => [taskId, task];
 }
 
+@immutable
 class UploadCancelled extends UploadState {
   final String taskId;
   final UploadTask task;
@@ -220,6 +229,7 @@ class UploadCancelled extends UploadState {
 }
 
 /// 🌐 上传警告状态（网络相关）
+@immutable
 class UploadWarning extends UploadState {
   final String taskId;
   final String warningMessage;
@@ -247,6 +257,7 @@ enum WarningType {
   lowBattery,
 }
 
+@immutable
 class UploadQueueLoaded extends UploadState {
   final List<UploadTask> pending;
   final List<UploadTask> uploading;
