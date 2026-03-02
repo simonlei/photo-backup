@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../services/rclone_service.dart';
+import '../services/config_service.dart';  // 🔒 新增配置服务
 
 class SettingsScreen extends StatefulWidget {
   const SettingsScreen({Key? key}) : super(key: key);
@@ -14,6 +15,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
   final _formKey = GlobalKey<FormState>();
   final _storage = const FlutterSecureStorage();
   final _rcloneService = RcloneService();
+  final _configService = ConfigService();  // 🔒 新增配置服务
 
   // NAS 配置
   final _nasUrlController = TextEditingController();
@@ -49,6 +51,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
   }
 
   /// 保存配置
+  /// 保存 NAS 配置（🔒 使用密码混淆）
   Future<void> _saveConfig() async {
     if (!_formKey.currentState!.validate()) return;
 
@@ -63,19 +66,22 @@ class _SettingsScreenState extends State<SettingsScreen> {
       await _storage.write(key: 'nas_username', value: _usernameController.text);
       await _storage.write(key: 'nas_password', value: _passwordController.text);
 
-      // 生成 rclone 配置
-      final rcloneConfig = _generateRcloneConfig();
-      await _rcloneService.saveConfig(rcloneConfig);
+      // 🔒 使用 ConfigService 保存配置（自动混淆密码）
+      await _configService.setCredentials(
+        nasUrl: _nasUrlController.text,
+        username: _usernameController.text,
+        password: _passwordController.text,
+      );
 
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('配置已保存')),
+          const SnackBar(content: Text('✅ 配置已保存（密码已加密）')),
         );
       }
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('保存失败: $e')),
+          SnackBar(content: Text('保存失败: $e'), backgroundColor: Colors.red),
         );
       }
     } finally {
@@ -93,9 +99,12 @@ class _SettingsScreenState extends State<SettingsScreen> {
     });
 
     try {
-      // 先保存配置
-      final rcloneConfig = _generateRcloneConfig();
-      await _rcloneService.saveConfig(rcloneConfig);
+      // 🔒 先保存配置（密码会被混淆）
+      await _configService.setCredentials(
+        nasUrl: _nasUrlController.text,
+        username: _usernameController.text,
+        password: _passwordController.text,
+      );
 
       // 测试连接
       final success = await _rcloneService.testConnection();

@@ -41,6 +41,7 @@ class MainActivity: FlutterActivity() {
                     "getActiveUploads" -> handleGetActiveUploads(result)
                     "testConnection" -> handleTestConnection(call, result)
                     "saveRcloneConfig" -> handleSaveConfig(call, result)
+                    "obscurePassword" -> handleObscurePassword(call, result)  // 🔒 新增密码混淆
                     else -> result.notImplemented()
                 }
             }
@@ -148,9 +149,55 @@ class MainActivity: FlutterActivity() {
         try {
             val configFile = java.io.File(filesDir, "rclone.conf")
             configFile.writeText(config)
+            
+            // ✅ 不在日志中记录配置内容（避免密码泄露）
+            android.util.Log.d("MainActivity", "Config saved (${config.length} bytes)")
             result.success(null)
         } catch (e: Exception) {
             result.error("IO_ERROR", e.message, null)
+        }
+    }
+    
+    /**
+     * 🔒 混淆密码（调用 rclone obscure 命令）
+     * 用于在存储和传输前保护密码安全
+     */
+    private fun handleObscurePassword(call: MethodCall, result: MethodChannel.Result) {
+        val password = call.argument<String>("password") ?: run {
+            result.error("INVALID_ARGUMENT", "password is required", null)
+            return
+        }
+        
+        thread {
+            try {
+                val rclonePath = "${applicationInfo.nativeLibraryDir}/librclone.so"
+                
+                // 调用 rclone obscure
+                val process = ProcessBuilder(rclonePath, "obscure", password)
+                    .redirectErrorStream(true)
+                    .start()
+                
+                val reader = java.io.BufferedReader(
+                    java.io.InputStreamReader(process.inputStream)
+                )
+                
+                val obscured = reader.use { it.readLine() }
+                    ?: throw Exception("rclone obscure returned empty result")
+                
+                val exitCode = process.waitFor()
+                
+                if (exitCode != 0) {
+                    throw Exception("rclone obscure failed with exit code $exitCode")
+                }
+                
+                mainHandler.post {
+                    result.success(obscured)
+                }
+            } catch (e: Exception) {
+                mainHandler.post {
+                    result.error("OBSCURE_ERROR", "Failed to obscure password: ${e.message}", null)
+                }
+            }
         }
     }
     

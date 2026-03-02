@@ -26,6 +26,7 @@ class RcloneProcessManager(private val context: Context) {
     
     private val activeProcesses = ConcurrentHashMap<String, ProcessInfo>()
     private val pidFile = File(context.filesDir, PID_FILE)
+    private val pidFileLock = Any()  // 🔒 添加锁对象，保护 PID 文件操作
     
     data class ProcessInfo(
         val process: Process,
@@ -142,6 +143,7 @@ class RcloneProcessManager(private val context: Context) {
     
     /**
      * 监控上传进度
+     * 🔒 使用 use 块自动关闭 BufferedReader，防止内存泄漏
      */
     private fun startProgressMonitor(
         process: Process,
@@ -150,14 +152,15 @@ class RcloneProcessManager(private val context: Context) {
     ) {
         thread {
             try {
-                val reader = BufferedReader(InputStreamReader(process.errorStream))
-                var line: String?
-                
-                while (reader.readLine().also { line = it } != null) {
-                    line?.let { 
-                        parseProgress(it, uploadId)?.let(callback)
+                BufferedReader(InputStreamReader(process.errorStream)).use { reader ->
+                    var line: String?
+                    
+                    while (reader.readLine().also { line = it } != null) {
+                        line?.let { 
+                            parseProgress(it, uploadId)?.let(callback)
+                        }
                     }
-                }
+                }  // ✅ use 块自动关闭 reader
             } catch (e: Exception) {
                 Log.e(TAG, "Progress monitor error for $uploadId", e)
             }
@@ -278,32 +281,38 @@ class RcloneProcessManager(private val context: Context) {
     
     /**
      * 保存 PID 到文件（追加模式）
+     * 🔒 线程安全：使用 synchronized 保护文件操作
      */
     private fun savePid(pid: Long) {
-        try {
-            pidFile.appendText("$pid\n")
-        } catch (e: Exception) {
-            Log.e(TAG, "Failed to save PID: $pid", e)
+        synchronized(pidFileLock) {
+            try {
+                pidFile.appendText("$pid\n")
+            } catch (e: Exception) {
+                Log.e(TAG, "Failed to save PID: $pid", e)
+            }
         }
     }
     
     /**
      * 从文件中移除 PID
+     * 🔒 线程安全：使用 synchronized 保护文件操作
      */
     private fun removePid(pid: Long) {
-        try {
-            if (!pidFile.exists()) return
-            
-            val pids = pidFile.readLines()
-                .filter { it != pid.toString() }
-            
-            if (pids.isEmpty()) {
-                pidFile.delete()
-            } else {
-                pidFile.writeText(pids.joinToString("\n") + "\n")
+        synchronized(pidFileLock) {
+            try {
+                if (!pidFile.exists()) return
+                
+                val pids = pidFile.readLines()
+                    .filter { it != pid.toString() }
+                
+                if (pids.isEmpty()) {
+                    pidFile.delete()
+                } else {
+                    pidFile.writeText(pids.joinToString("\n") + "\n")
+                }
+            } catch (e: Exception) {
+                Log.e(TAG, "Failed to remove PID: $pid", e)
             }
-        } catch (e: Exception) {
-            Log.e(TAG, "Failed to remove PID: $pid", e)
         }
     }
     
