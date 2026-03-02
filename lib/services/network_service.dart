@@ -15,22 +15,12 @@ class NetworkService {
   NetworkService._internal();
   
   /// 当前网络状态流
-  Stream<List<ConnectivityResult>> get onConnectivityChanged =>
+  Stream<ConnectivityResult> get onConnectivityChanged =>
       _connectivity.onConnectivityChanged;
   
   /// 检查当前网络连接状态
   Future<ConnectivityResult> checkConnectivity() async {
-    final results = await _connectivity.checkConnectivity();
-    // connectivity_plus 5.x 返回 List<ConnectivityResult>
-    // 如果是 ConnectivityResult 直接返回（兼容旧版本）
-    if (results is ConnectivityResult) {
-      return results as ConnectivityResult;
-    }
-    // 如果是 List，取第一个或返回 none
-    if (results is List<ConnectivityResult>) {
-      return results.isEmpty ? ConnectivityResult.none : results.first;
-    }
-    return ConnectivityResult.none;
+    return await _connectivity.checkConnectivity();
   }
   
   /// 是否有网络连接
