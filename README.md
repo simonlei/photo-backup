@@ -1,10 +1,17 @@
-# Photo Backup App 📸
+<div align="center">
 
-> 隐私优先的照片备份应用 - 直连 NAS 和云存储，无需中间服务器
+# 📸 Photo Backup App
 
-[![Flutter](https://img.shields.io/badge/Flutter-3.0+-blue.svg)](https://flutter.dev)
-[![License](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)
-[![Platform](https://img.shields.io/badge/Platform-Android-brightgreen.svg)](https://www.android.com)
+**隐私优先的照片备份应用 - 直连 NAS 和云存储，无需中间服务器**
+
+[![Flutter](https://img.shields.io/badge/Flutter-3.0+-02569B?style=for-the-badge&logo=flutter&logoColor=white)](https://flutter.dev)
+[![Android](https://img.shields.io/badge/Android-5.0+-3DDC84?style=for-the-badge&logo=android&logoColor=white)](https://www.android.com)
+[![License](https://img.shields.io/badge/License-MIT-yellow?style=for-the-badge)](LICENSE)
+[![Stars](https://img.shields.io/github/stars/simonlei/photo-backup?style=for-the-badge)](https://github.com/simonlei/photo-backup/stargazers)
+
+[🚀 快速开始](QUICKSTART.md) • [📖 文档](LOCAL_RUN_GUIDE.md) • [🐛 反馈问题](https://github.com/simonlei/photo-backup/issues)
+
+</div>
 
 ---
 
