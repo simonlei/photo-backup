@@ -30,7 +30,7 @@ jobs:
         run: flutter pub get
       
       - name: Download rclone binary
-        run: bash init-project.sh
+        run: bash download-rclone.sh
       
       - name: Build APK
         run: flutter build apk --release --split-per-abi
