@@ -134,41 +134,39 @@ class HomeScreen extends StatelessWidget {
     return Card(
       child: Padding(
         padding: const EdgeInsets.all(16),
-        children: [
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceAround,
-            children: [
-              _buildStatItem(
-                context,
-                Icons.cloud_queue,
-                '总任务',
-                state.totalCount.toString(),
-                Colors.blue,
-              ),
-              _buildStatItem(
-                context,
-                Icons.cloud_upload,
-                '上传中',
-                state.uploading.length.toString(),
-                Colors.orange,
-              ),
-              _buildStatItem(
-                context,
-                Icons.cloud_done,
-                '已完成',
-                state.completed.length.toString(),
-                Colors.green,
-              ),
-              _buildStatItem(
-                context,
-                Icons.error_outline,
-                '失败',
-                state.failed.length.toString(),
-                Colors.red,
-              ),
-            ],
-          ),
-        ],
+        child: Row(
+          mainAxisAlignment: MainAxisAlignment.spaceAround,
+          children: [
+            _buildStatItem(
+              context,
+              Icons.cloud_queue,
+              '总任务',
+              state.totalCount.toString(),
+              Colors.blue,
+            ),
+            _buildStatItem(
+              context,
+              Icons.cloud_upload,
+              '上传中',
+              state.uploading.length.toString(),
+              Colors.orange,
+            ),
+            _buildStatItem(
+              context,
+              Icons.cloud_done,
+              '已完成',
+              state.completed.length.toString(),
+              Colors.green,
+            ),
+            _buildStatItem(
+              context,
+              Icons.error_outline,
+              '失败',
+              state.failed.length.toString(),
+              Colors.red,
+            ),
+          ],
+        ),
       ),
     );
   }

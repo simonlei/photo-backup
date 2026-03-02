@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'package:flutter/services.dart';
+import 'package:photo_backup_app/models/upload_task.dart';
 import 'package:flutter/foundation.dart';  // 🔒 添加 @immutable
 
 /// rclone 服务封装
@@ -207,13 +208,6 @@ class UploadProgress {
   }
 }
 
-enum UploadStatus {
-  pending,
-  uploading,
-  completed,
-  failed,
-  cancelled,
-}
 
 // 自定义异常
 class AppException implements Exception {
