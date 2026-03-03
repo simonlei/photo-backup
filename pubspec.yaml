@@ -63,6 +63,11 @@ dev_dependencies:
   integration_test:
     sdk: flutter
 
+# Force win32 to a version compatible with Dart 3.10.x
+# win32 <5.5.1 uses UnmodifiableUint8ListView which was removed in Dart 3.4+
+dependency_overrides:
+  win32: ^5.5.1
+
 flutter:
   uses-material-design: true
   
