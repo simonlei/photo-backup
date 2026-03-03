@@ -31,13 +31,6 @@ subprojects {
 // 为所有子项目配置通用依赖
 configure(subprojects.findAll { it.name != 'app' }) {
     if (project.hasProperty('android')) {
-        project.android {
-            compileOptions {
-                sourceCompatibility JavaVersion.VERSION_17
-                targetCompatibility JavaVersion.VERSION_17
-            }
-        }
-        
         project.dependencies {
             compileOnly 'androidx.core:core-ktx:1.12.0'
         }
