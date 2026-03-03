@@ -573,58 +573,60 @@ class UploadBloc extends Bloc<UploadEvent, UploadState> {
     final uploadingTask = task.copyWith(status: UploadStatus.uploading);
     await _queueService.updateTask(uploadingTask);
 
-    final subscription = _rcloneService.uploadFile(
-      uploadId: task.id,
-      localPath: task.localPath,
-      remotePath: task.remotePath,
-    ).listen(
-      (progress) {
-        emit(UploadInProgress(
-          taskId: task.id,
-          progress: progress.percent,
-          speedMBps: progress.speedMBps,
-          etaSeconds: progress.etaSeconds,
-          totalCount: _activeUploads.length,
-        ));
+    try {
+      await emit.forEach<UploadProgress>(
+        _rcloneService.uploadFile(
+          uploadId: task.id,
+          localPath: task.localPath,
+          remotePath: task.remotePath,
+        ),
+        onData: (progress) {
+          // 更新队列中的进度（fire-and-forget，不影响状态发射）
+          _queueService.updateProgress(task.id, progress.percent);
 
-        // 更新队列中的进度
-        _queueService.updateProgress(task.id, progress.percent);
-      },
-      onError: (error) async {
-        _activeUploads.remove(task.id);
-        _uploadSubscriptions.remove(task.id);
+          return UploadInProgress(
+            taskId: task.id,
+            progress: progress.percent,
+            speedMBps: progress.speedMBps,
+            etaSeconds: progress.etaSeconds,
+            totalCount: _activeUploads.length,
+          );
+        },
+        onError: (error, stackTrace) {
+          _activeUploads.remove(task.id);
+          _uploadSubscriptions.remove(task.id);
 
-        final failedTask = task.copyWith(
-          status: UploadStatus.failed,
-          errorMessage: error.toString(),
-        );
-        await _queueService.updateTask(failedTask);
-        emit(UploadFailure(
-          taskId: task.id,
-          errorMessage: error.toString(),
-          failedTask: failedTask,
-        ));
+          final failedTask = task.copyWith(
+            status: UploadStatus.failed,
+            errorMessage: error.toString(),
+          );
+          _queueService.updateTask(failedTask);
+          return UploadFailure(
+            taskId: task.id,
+            errorMessage: error.toString(),
+            failedTask: failedTask,
+          );
+        },
+      );
 
-        // 继续处理队列
-        _processNextTask(emit);
-      },
-      onDone: () async {
-        _activeUploads.remove(task.id);
-        _uploadSubscriptions.remove(task.id);
+      // Stream 正常结束 → 上传成功
+      _activeUploads.remove(task.id);
+      _uploadSubscriptions.remove(task.id);
 
-        final completedTask = task.copyWith(
-          status: UploadStatus.completed,
-          progress: 100.0,
-        );
-        await _queueService.updateTask(completedTask);
-        emit(UploadSuccess(taskId: task.id, task: completedTask));
+      final completedTask = task.copyWith(
+        status: UploadStatus.completed,
+        progress: 100.0,
+      );
+      await _queueService.updateTask(completedTask);
+      emit(UploadSuccess(taskId: task.id, task: completedTask));
 
-        // 继续处理下一个任务
-        _processNextTask(emit);
-      },
-    );
-
-    _uploadSubscriptions[task.id] = subscription;
+      // 继续处理下一个任务
+      _processNextTask(emit);
+    } catch (e) {
+      _activeUploads.remove(task.id);
+      _uploadSubscriptions.remove(task.id);
+      emit(UploadFailure(taskId: task.id, errorMessage: e.toString()));
+    }
   }
 
   /// 处理队列中的下一个任务

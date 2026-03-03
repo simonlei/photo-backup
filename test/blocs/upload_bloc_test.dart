@@ -2,16 +2,20 @@ import 'dart:async';
 import 'package:bloc_test/bloc_test.dart';
 import 'package:connectivity_plus/connectivity_plus.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:mockito/annotations.dart';
-import 'package:mockito/mockito.dart';
+import 'package:mocktail/mocktail.dart';
 import 'package:photo_backup_app/blocs/upload_bloc.dart';
 import 'package:photo_backup_app/models/upload_task.dart';
 import 'package:photo_backup_app/services/network_service.dart';
 import 'package:photo_backup_app/services/rclone_service.dart';
 import 'package:photo_backup_app/services/upload_queue_service.dart';
 
-@GenerateMocks([RcloneService, UploadQueueService, NetworkService])
-import 'upload_bloc_test.mocks.dart';
+// --- Mocks (mocktail, no code generation needed) ---
+
+class MockRcloneService extends Mock implements RcloneService {}
+class MockUploadQueueService extends Mock implements UploadQueueService {}
+class MockNetworkService extends Mock implements NetworkService {}
+
+// --- Helpers ---
 
 UploadTask makeTask(String id, {UploadStatus status = UploadStatus.pending}) {
   final now = DateTime(2024, 6, 1);
@@ -23,6 +27,22 @@ UploadTask makeTask(String id, {UploadStatus status = UploadStatus.pending}) {
     progress: 0.0,
     createdAt: now,
     updatedAt: now,
+  );
+}
+
+UploadProgress makeProgress(
+  String uploadId, {
+  double percent = 100.0,
+  UploadStatus status = UploadStatus.completed,
+}) {
+  return UploadProgress(
+    uploadId: uploadId,
+    percent: percent,
+    bytesTransferred: 1000,
+    totalBytes: 1000,
+    speedMBps: 2.0,
+    etaSeconds: 0,
+    status: status,
   );
 }
 
@@ -47,52 +67,54 @@ void main() {
     mockRclone = MockRcloneService();
     mockQueue = MockUploadQueueService();
     mockNetwork = MockNetworkService();
+    registerFallbackValue(makeTask('fallback'));
+    registerFallbackValue(UploadStatus.pending);
   });
 
-  // Default stubs used across multiple tests
-  void stubQueueDefaults() {
-    when(mockQueue.addTask(any)).thenAnswer((_) async {});
-    when(mockQueue.updateTask(any)).thenAnswer((_) async {});
-    when(mockQueue.updateProgress(any, any)).thenAnswer((_) async {});
-    when(mockQueue.getPendingTasks()).thenAnswer((_) async => []);
-    when(mockQueue.getAllTasks()).thenAnswer((_) async => []);
-    when(mockQueue.getTask(any)).thenAnswer((_) async => null);
-    when(mockQueue.getStatistics()).thenAnswer((_) async => {});
-    when(mockQueue.getTotalCount()).thenAnswer((_) async => 0);
-    when(mockQueue.deleteCompletedTasks(olderThanDays: anyNamed('olderThanDays')))
+  // Shared stub helpers
+  void stubQueueOk() {
+    when(() => mockQueue.addTask(any())).thenAnswer((_) async {});
+    when(() => mockQueue.addTasks(any())).thenAnswer((_) async {});
+    when(() => mockQueue.updateTask(any())).thenAnswer((_) async {});
+    when(() => mockQueue.updateProgress(any(), any())).thenAnswer((_) async {});
+    when(() => mockQueue.getPendingTasks()).thenAnswer((_) async => []);
+    when(() => mockQueue.getAllTasks()).thenAnswer((_) async => []);
+    when(() => mockQueue.getTask(any())).thenAnswer((_) async => null);
+    when(() => mockQueue.getStatistics()).thenAnswer((_) async => {});
+    when(() => mockQueue.getTotalCount()).thenAnswer((_) async => 0);
+    when(() => mockQueue.deleteCompletedTasks(olderThanDays: any(named: 'olderThanDays')))
         .thenAnswer((_) async {});
-    when(mockQueue.close()).thenAnswer((_) async {});
+    when(() => mockQueue.close()).thenAnswer((_) async {});
   }
 
-  void stubRcloneDefaults() {
-    when(mockRclone.cancelUpload(any)).thenAnswer((_) async => true);
-    when(mockRclone.dispose()).thenAnswer((_) async {});
+  void stubRcloneOk() {
+    when(() => mockRclone.cancelUpload(any())).thenAnswer((_) async => true);
+    when(() => mockRclone.dispose()).thenAnswer((_) async {});
   }
+
+  // ── Initial state ──────────────────────────────────────────────────────────
 
   group('UploadBloc initial state', () {
     test('starts with UploadInitial', () {
-      stubQueueDefaults();
-      stubRcloneDefaults();
-      when(mockNetwork.checkBeforeUpload())
-          .thenAnswer((_) async => NetworkCheckResult.ok);
-
-      final bloc = makeBloc(
-          rclone: mockRclone, queue: mockQueue, network: mockNetwork);
+      stubQueueOk();
+      stubRcloneOk();
+      final bloc = makeBloc(rclone: mockRclone, queue: mockQueue, network: mockNetwork);
       expect(bloc.state, isA<UploadInitial>());
       bloc.close();
     });
   });
 
+  // ── StartUpload — network checks ───────────────────────────────────────────
+
   group('StartUpload — network checks', () {
     blocTest<UploadBloc, UploadState>(
       'emits UploadFailure when no network connection',
       build: () {
-        stubQueueDefaults();
-        stubRcloneDefaults();
-        when(mockNetwork.checkBeforeUpload())
+        stubQueueOk();
+        stubRcloneOk();
+        when(() => mockNetwork.checkBeforeUpload())
             .thenAnswer((_) async => NetworkCheckResult.noConnection);
-        return makeBloc(
-            rclone: mockRclone, queue: mockQueue, network: mockNetwork);
+        return makeBloc(rclone: mockRclone, queue: mockQueue, network: mockNetwork);
       },
       act: (bloc) => bloc.add(const StartUpload(
         taskId: 'task-1',
@@ -109,30 +131,20 @@ void main() {
     );
 
     blocTest<UploadBloc, UploadState>(
-      'emits UploadWarning when on mobile data but continues upload',
+      'emits UploadWarning then continues upload on mobile data',
       build: () {
-        stubQueueDefaults();
-        stubRcloneDefaults();
-        when(mockNetwork.checkBeforeUpload())
+        stubQueueOk();
+        stubRcloneOk();
+        when(() => mockNetwork.checkBeforeUpload())
             .thenAnswer((_) async => NetworkCheckResult.mobile);
-        // Upload stream returns a single completed progress event
-        when(mockRclone.uploadFile(
-          uploadId: anyNamed('uploadId'),
-          localPath: anyNamed('localPath'),
-          remotePath: anyNamed('remotePath'),
-        )).thenAnswer((_) => Stream.value(UploadProgress(
-              uploadId: 'task-1',
-              percent: 100.0,
-              bytesTransferred: 1000,
-              totalBytes: 1000,
-              speedMBps: 2.0,
-              etaSeconds: 0,
-              status: UploadStatus.completed,
-            )));
-        when(mockQueue.getTask('task-1'))
+        when(() => mockRclone.uploadFile(
+          uploadId: any(named: 'uploadId'),
+          localPath: any(named: 'localPath'),
+          remotePath: any(named: 'remotePath'),
+        )).thenAnswer((_) => Stream.value(makeProgress('task-1')));
+        when(() => mockQueue.getTask('task-1'))
             .thenAnswer((_) async => makeTask('task-1'));
-        return makeBloc(
-            rclone: mockRclone, queue: mockQueue, network: mockNetwork);
+        return makeBloc(rclone: mockRclone, queue: mockQueue, network: mockNetwork);
       },
       act: (bloc) => bloc.add(const StartUpload(
         taskId: 'task-1',
@@ -145,36 +157,26 @@ void main() {
           'warningType',
           WarningType.mobileData,
         ),
-        // Upload continues after the warning
         isA<UploadInProgress>(),
         isA<UploadSuccess>(),
       ],
     );
 
     blocTest<UploadBloc, UploadState>(
-      'starts upload when WiFi is available',
+      'starts upload and emits UploadInProgress + UploadSuccess on WiFi',
       build: () {
-        stubQueueDefaults();
-        stubRcloneDefaults();
-        when(mockNetwork.checkBeforeUpload())
+        stubQueueOk();
+        stubRcloneOk();
+        when(() => mockNetwork.checkBeforeUpload())
             .thenAnswer((_) async => NetworkCheckResult.ok);
-        when(mockRclone.uploadFile(
-          uploadId: anyNamed('uploadId'),
-          localPath: anyNamed('localPath'),
-          remotePath: anyNamed('remotePath'),
-        )).thenAnswer((_) => Stream.value(UploadProgress(
-              uploadId: 'task-1',
-              percent: 100.0,
-              bytesTransferred: 500,
-              totalBytes: 500,
-              speedMBps: 5.0,
-              etaSeconds: 0,
-              status: UploadStatus.completed,
-            )));
-        when(mockQueue.getTask('task-1'))
+        when(() => mockRclone.uploadFile(
+          uploadId: any(named: 'uploadId'),
+          localPath: any(named: 'localPath'),
+          remotePath: any(named: 'remotePath'),
+        )).thenAnswer((_) => Stream.value(makeProgress('task-1')));
+        when(() => mockQueue.getTask('task-1'))
             .thenAnswer((_) async => makeTask('task-1'));
-        return makeBloc(
-            rclone: mockRclone, queue: mockQueue, network: mockNetwork);
+        return makeBloc(rclone: mockRclone, queue: mockQueue, network: mockNetwork);
       },
       act: (bloc) => bloc.add(const StartUpload(
         taskId: 'task-1',
@@ -188,16 +190,17 @@ void main() {
     );
   });
 
+  // ── CancelUpload ───────────────────────────────────────────────────────────
+
   group('CancelUpload', () {
     blocTest<UploadBloc, UploadState>(
       'emits UploadCancelled when task exists',
       build: () {
-        stubQueueDefaults();
-        stubRcloneDefaults();
-        final task = makeTask('task-1');
-        when(mockQueue.getTask('task-1')).thenAnswer((_) async => task);
-        return makeBloc(
-            rclone: mockRclone, queue: mockQueue, network: mockNetwork);
+        stubQueueOk();
+        stubRcloneOk();
+        when(() => mockQueue.getTask('task-1'))
+            .thenAnswer((_) async => makeTask('task-1'));
+        return makeBloc(rclone: mockRclone, queue: mockQueue, network: mockNetwork);
       },
       act: (bloc) => bloc.add(const CancelUpload('task-1')),
       expect: () => [
@@ -208,32 +211,31 @@ void main() {
     blocTest<UploadBloc, UploadState>(
       'emits nothing when task does not exist',
       build: () {
-        stubQueueDefaults();
-        stubRcloneDefaults();
-        when(mockQueue.getTask(any)).thenAnswer((_) async => null);
-        return makeBloc(
-            rclone: mockRclone, queue: mockQueue, network: mockNetwork);
+        stubQueueOk();
+        stubRcloneOk();
+        return makeBloc(rclone: mockRclone, queue: mockQueue, network: mockNetwork);
       },
       act: (bloc) => bloc.add(const CancelUpload('nonexistent')),
       expect: () => [],
     );
   });
 
+  // ── LoadUploadQueue ────────────────────────────────────────────────────────
+
   group('LoadUploadQueue', () {
     blocTest<UploadBloc, UploadState>(
       'emits UploadQueueLoaded with categorized tasks',
       build: () {
-        stubQueueDefaults();
-        stubRcloneDefaults();
-        when(mockQueue.getAllTasks()).thenAnswer((_) async => [
+        stubQueueOk();
+        stubRcloneOk();
+        when(() => mockQueue.getAllTasks()).thenAnswer((_) async => [
               makeTask('p1', status: UploadStatus.pending),
               makeTask('u1', status: UploadStatus.uploading),
               makeTask('c1', status: UploadStatus.completed),
               makeTask('f1', status: UploadStatus.failed),
               makeTask('ca1', status: UploadStatus.cancelled),
             ]);
-        return makeBloc(
-            rclone: mockRclone, queue: mockQueue, network: mockNetwork);
+        return makeBloc(rclone: mockRclone, queue: mockQueue, network: mockNetwork);
       },
       act: (bloc) => bloc.add(const LoadUploadQueue()),
       expect: () => [
@@ -246,28 +248,25 @@ void main() {
     );
 
     blocTest<UploadBloc, UploadState>(
-      'emits UploadQueueLoaded with empty lists when queue is empty',
+      'emits UploadQueueLoaded with zero totalCount when queue is empty',
       build: () {
-        stubQueueDefaults();
-        stubRcloneDefaults();
-        return makeBloc(
-            rclone: mockRclone, queue: mockQueue, network: mockNetwork);
+        stubQueueOk();
+        stubRcloneOk();
+        return makeBloc(rclone: mockRclone, queue: mockQueue, network: mockNetwork);
       },
       act: (bloc) => bloc.add(const LoadUploadQueue()),
       expect: () => [
-        isA<UploadQueueLoaded>()
-            .having((s) => s.totalCount, 'totalCount', 0),
+        isA<UploadQueueLoaded>().having((s) => s.totalCount, 'totalCount', 0),
       ],
     );
 
     blocTest<UploadBloc, UploadState>(
       'emits UploadFailure when queue throws',
       build: () {
-        stubQueueDefaults();
-        stubRcloneDefaults();
-        when(mockQueue.getAllTasks()).thenThrow(Exception('db error'));
-        return makeBloc(
-            rclone: mockRclone, queue: mockQueue, network: mockNetwork);
+        stubQueueOk();
+        stubRcloneOk();
+        when(() => mockQueue.getAllTasks()).thenThrow(Exception('db error'));
+        return makeBloc(rclone: mockRclone, queue: mockQueue, network: mockNetwork);
       },
       act: (bloc) => bloc.add(const LoadUploadQueue()),
       expect: () => [
@@ -280,31 +279,24 @@ void main() {
     );
   });
 
+  // ── RetryUpload ────────────────────────────────────────────────────────────
+
   group('RetryUpload', () {
     blocTest<UploadBloc, UploadState>(
       'retries a failed task and emits UploadInProgress + UploadSuccess',
       build: () {
-        stubQueueDefaults();
-        stubRcloneDefaults();
-        when(mockNetwork.checkBeforeUpload())
+        stubQueueOk();
+        stubRcloneOk();
+        when(() => mockNetwork.checkBeforeUpload())
             .thenAnswer((_) async => NetworkCheckResult.ok);
-        final failedTask = makeTask('t1', status: UploadStatus.failed);
-        when(mockQueue.getTask('t1')).thenAnswer((_) async => failedTask);
-        when(mockRclone.uploadFile(
-          uploadId: anyNamed('uploadId'),
-          localPath: anyNamed('localPath'),
-          remotePath: anyNamed('remotePath'),
-        )).thenAnswer((_) => Stream.value(UploadProgress(
-              uploadId: 't1',
-              percent: 100.0,
-              bytesTransferred: 200,
-              totalBytes: 200,
-              speedMBps: 1.0,
-              etaSeconds: 0,
-              status: UploadStatus.completed,
-            )));
-        return makeBloc(
-            rclone: mockRclone, queue: mockQueue, network: mockNetwork);
+        when(() => mockQueue.getTask('t1'))
+            .thenAnswer((_) async => makeTask('t1', status: UploadStatus.failed));
+        when(() => mockRclone.uploadFile(
+          uploadId: any(named: 'uploadId'),
+          localPath: any(named: 'localPath'),
+          remotePath: any(named: 'remotePath'),
+        )).thenAnswer((_) => Stream.value(makeProgress('t1')));
+        return makeBloc(rclone: mockRclone, queue: mockQueue, network: mockNetwork);
       },
       act: (bloc) => bloc.add(const RetryUpload('t1')),
       expect: () => [
@@ -314,48 +306,49 @@ void main() {
     );
 
     blocTest<UploadBloc, UploadState>(
-      'does nothing for a task that cannot retry',
+      'does nothing for a task that cannot retry (completed)',
       build: () {
-        stubQueueDefaults();
-        stubRcloneDefaults();
-        final completedTask = makeTask('t1', status: UploadStatus.completed);
-        when(mockQueue.getTask('t1')).thenAnswer((_) async => completedTask);
-        return makeBloc(
-            rclone: mockRclone, queue: mockQueue, network: mockNetwork);
+        stubQueueOk();
+        stubRcloneOk();
+        when(() => mockQueue.getTask('t1'))
+            .thenAnswer((_) async => makeTask('t1', status: UploadStatus.completed));
+        return makeBloc(rclone: mockRclone, queue: mockQueue, network: mockNetwork);
       },
       act: (bloc) => bloc.add(const RetryUpload('t1')),
-      expect: () => [], // no state change
+      expect: () => [],
     );
   });
 
+  // ── ClearCompleted ─────────────────────────────────────────────────────────
+
   group('ClearCompleted', () {
     blocTest<UploadBloc, UploadState>(
-      'calls deleteCompletedTasks and then reloads queue',
+      'calls deleteCompletedTasks and reloads queue',
       build: () {
-        stubQueueDefaults();
-        stubRcloneDefaults();
-        return makeBloc(
-            rclone: mockRclone, queue: mockQueue, network: mockNetwork);
+        stubQueueOk();
+        stubRcloneOk();
+        return makeBloc(rclone: mockRclone, queue: mockQueue, network: mockNetwork);
       },
       act: (bloc) => bloc.add(const ClearCompleted(olderThanDays: 3)),
       verify: (_) {
-        verify(mockQueue.deleteCompletedTasks(olderThanDays: 3)).called(1);
-        verify(mockQueue.getAllTasks()).called(1);
+        verify(() => mockQueue.deleteCompletedTasks(olderThanDays: 3)).called(1);
+        verify(() => mockQueue.getAllTasks()).called(1);
       },
       expect: () => [isA<UploadQueueLoaded>()],
     );
   });
 
+  // ── PauseUpload ────────────────────────────────────────────────────────────
+
   group('PauseUpload', () {
     blocTest<UploadBloc, UploadState>(
       'emits UploadPaused when task exists',
       build: () {
-        stubQueueDefaults();
-        stubRcloneDefaults();
-        final task = makeTask('t1', status: UploadStatus.uploading);
-        when(mockQueue.getTask('t1')).thenAnswer((_) async => task);
-        return makeBloc(
-            rclone: mockRclone, queue: mockQueue, network: mockNetwork);
+        stubQueueOk();
+        stubRcloneOk();
+        when(() => mockQueue.getTask('t1'))
+            .thenAnswer((_) async => makeTask('t1', status: UploadStatus.uploading));
+        return makeBloc(rclone: mockRclone, queue: mockQueue, network: mockNetwork);
       },
       act: (bloc) => bloc.add(const PauseUpload('t1')),
       expect: () => [
